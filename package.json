@@ -1,0 +1,58 @@
+{
+  "name": "confts",
+  "version": "0.0.1",
+  "description": "Dev-friendly TypeScript configuration library with Zod",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "config",
+    "configuration",
+    "typescript",
+    "zod",
+    "yaml",
+    "json",
+    "env"
+  ],
+  "author": "rstagi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rstagi/confts.git"
+  },
+  "peerDependencies": {
+    "zod": "^3.0.0"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.10.2",
+    "@eslint/js": "^9.16.0",
+    "eslint": "^9.16.0",
+    "typescript-eslint": "^8.18.0",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8",
+    "zod": "^3.24.1"
+  }
+}
