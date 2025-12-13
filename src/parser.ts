@@ -4,6 +4,7 @@ import { loadYaml } from "./loaders/yaml";
 import { loadJson } from "./loaders/json";
 import { resolve } from "./resolver";
 import { ConfigError } from "./errors";
+import type { ConftsSchema, InferSchema } from "./types";
 
 export interface ParseOptions {
   configPath?: string;
@@ -11,10 +12,10 @@ export interface ParseOptions {
   secretsPath?: string;
 }
 
-export function parse<T extends ZodObject<Record<string, ZodTypeAny>>>(
-  schema: T,
+export function parse<S extends ConftsSchema<Record<string, unknown>>>(
+  schema: S,
   options: ParseOptions = {}
-): ReturnType<T["parse"]> {
+): InferSchema<S> {
   const { env = process.env, secretsPath = "/secrets" } = options;
   const configPath = options.configPath ?? env.CONFIG_PATH;
 
@@ -49,5 +50,5 @@ export function parse<T extends ZodObject<Record<string, ZodTypeAny>>>(
     );
   }
 
-  return resolve(schema, { fileValues, env, secretsPath });
+  return resolve(schema, { fileValues, env, secretsPath }) as InferSchema<S>;
 }

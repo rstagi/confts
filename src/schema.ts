@@ -1,5 +1,10 @@
 import { z, type ZodTypeAny } from "zod";
-import { KEY_MARKER, type KeyConfig, type MarkedKeyConfig } from "./types";
+import {
+  KEY_MARKER,
+  type KeyConfig,
+  type MarkedKeyConfig,
+  type ConftsSchema,
+} from "./types";
 
 export function key<T extends ZodTypeAny>(config: KeyConfig<T>): MarkedKeyConfig<T> {
   return {
@@ -38,6 +43,8 @@ function buildZodShape(definition: Record<string, unknown>): Record<string, ZodT
   return shape;
 }
 
-export function schema<T extends Record<string, unknown>>(definition: T) {
-  return z.object(buildZodShape(definition));
+export function schema<const D extends Record<string, unknown>>(
+  definition: D
+): ConftsSchema<D> {
+  return z.object(buildZodShape(definition)) as ConftsSchema<D>;
 }

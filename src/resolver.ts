@@ -3,6 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { loadEnv } from "./loaders/env";
 import { loadSecretFile } from "./loaders/secretFile";
 import { ConfigError, formatValue } from "./errors";
+import type { ConftsSchema, InferSchema } from "./types";
 
 export interface ResolveOptions {
   fileValues?: Record<string, unknown>;
@@ -121,10 +122,10 @@ function resolveValue(
   return result.data;
 }
 
-export function resolve<T extends ZodObject<Record<string, ZodTypeAny>>>(
-  schema: T,
+export function resolve<S extends ConftsSchema<Record<string, unknown>>>(
+  schema: S,
   options: ResolveOptions = {}
-): ReturnType<T["parse"]> {
+): InferSchema<S> {
   const { fileValues, env = process.env, secretsPath = "/secrets" } = options;
-  return resolveValue(schema, [], fileValues, env, secretsPath) as ReturnType<T["parse"]>;
+  return resolveValue(schema, [], fileValues, env, secretsPath) as InferSchema<S>;
 }
