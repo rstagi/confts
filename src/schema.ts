@@ -1,4 +1,4 @@
-import type { ZodTypeAny } from "zod";
+import { z, type ZodTypeAny } from "zod";
 import { KEY_MARKER, type KeyConfig, type MarkedKeyConfig } from "./types";
 
 export function key<T extends ZodTypeAny>(config: KeyConfig<T>): MarkedKeyConfig<T> {
@@ -8,7 +8,36 @@ export function key<T extends ZodTypeAny>(config: KeyConfig<T>): MarkedKeyConfig
   };
 }
 
-export function schema<T extends Record<string, unknown>>(_definition: T): T {
-  // TODO: Phase 2 - convert to Zod schema
-  return _definition;
+function isMarkedKey(value: unknown): value is MarkedKeyConfig {
+  return typeof value === "object" && value !== null && KEY_MARKER in value;
+}
+
+function isPrimitive(value: unknown): value is string | number | boolean {
+  return typeof value === "string" || typeof value === "number" || typeof value === "boolean";
+}
+
+function buildZodShape(definition: Record<string, unknown>): Record<string, ZodTypeAny> {
+  const shape: Record<string, ZodTypeAny> = {};
+
+  for (const [k, v] of Object.entries(definition)) {
+    if (isMarkedKey(v)) {
+      const { type, env, secretFile, sensitive, default: defaultValue } = v;
+      const meta: Record<string, unknown> = {};
+      if (env !== undefined) meta.env = env;
+      if (secretFile !== undefined) meta.secretFile = secretFile;
+      if (sensitive !== undefined) meta.sensitive = sensitive;
+      if (defaultValue !== undefined) meta.default = defaultValue;
+      shape[k] = Object.keys(meta).length > 0 ? type.meta(meta) : type;
+    } else if (isPrimitive(v)) {
+      shape[k] = z.literal(v);
+    } else if (typeof v === "object" && v !== null) {
+      shape[k] = z.object(buildZodShape(v as Record<string, unknown>));
+    }
+  }
+
+  return shape;
+}
+
+export function schema<T extends Record<string, unknown>>(definition: T) {
+  return z.object(buildZodShape(definition));
 }
