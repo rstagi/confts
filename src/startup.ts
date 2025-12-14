@@ -1,6 +1,8 @@
-import { resolve as resolvePath } from "node:path";
+import { resolve as resolvePath, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolve } from "./resolver";
+import { loadYaml } from "./loaders/yaml";
+import { loadJson } from "./loaders/json";
 import type { ConftsSchema, InferSchema } from "./types";
 
 export interface ListenOptions {
@@ -13,11 +15,19 @@ export interface ServerLike {
   close(callback?: (err?: Error) => void): void;
 }
 
+export interface ResolveParams {
+  initialValues?: Record<string, unknown>;
+  configPath?: string;
+  env?: Record<string, string | undefined>;
+  secretsPath?: string;
+  override?: Record<string, unknown>;
+}
+
 export interface Service<
   _S extends ConftsSchema<Record<string, unknown>>,
   T extends ServerLike,
 > {
-  create: () => Promise<T>;
+  create: (options?: ResolveParams) => Promise<T>;
   run: (options?: RunOptions) => Promise<void>;
 }
 
@@ -27,17 +37,13 @@ export interface RunOptions {
   onReady?: () => void;
   onShutdown?: () => void;
   shutdownTimeout?: number;
+  configOverride?: Record<string, unknown>;
 }
 
-export interface StartupOptions {
+export interface StartupOptions extends ResolveParams {
   // Auto-run detection
   meta?: ImportMeta;
   module?: NodeModule;
-  // Resolution options
-  initialValues?: Record<string, unknown>;
-  env?: Record<string, string | undefined>;
-  secretsPath?: string;
-  override?: Record<string, unknown>;
 }
 
 function isMainModule(options: StartupOptions): boolean {
@@ -71,6 +77,16 @@ export function startup<
   factory: (config: InferSchema<S>) => T | Promise<T>
 ): Service<S, T>;
 
+function loadConfigFile(configPath: string): Record<string, unknown> | undefined {
+  const ext = extname(configPath).toLowerCase();
+  if (ext === ".yaml" || ext === ".yml") {
+    return loadYaml(configPath);
+  } else if (ext === ".json") {
+    return loadJson(configPath);
+  }
+  return undefined;
+}
+
 // Implementation
 export function startup<
   S extends ConftsSchema<Record<string, unknown>>,
@@ -84,22 +100,26 @@ export function startup<
   const options: StartupOptions = isOptionsSignature ? factoryOrOptions : {};
   const factory = isOptionsSignature ? maybeFactory! : factoryOrOptions;
 
-  const resolveConfig = () =>
-    resolve(configSchema, {
-      initialValues: options.initialValues,
-      env: options.env ?? process.env,
-      secretsPath: options.secretsPath,
-      override: options.override,
+  const resolveConfig = (overrides?: ResolveParams, overrideOnly?: Record<string, unknown>) => {
+    const params = overrides ?? options;
+    const fileValues = params.configPath ? loadConfigFile(params.configPath) : undefined;
+    return resolve(configSchema, {
+      initialValues: params.initialValues,
+      fileValues,
+      env: params.env ?? process.env,
+      secretsPath: params.secretsPath,
+      override: overrideOnly ?? params.override,
     }) as InferSchema<S>;
+  };
 
   const service: Service<S, T> = {
-    async create(): Promise<T> {
-      const config = resolveConfig();
+    async create(createOptions?: ResolveParams): Promise<T> {
+      const config = resolveConfig(createOptions);
       return factory(config);
     },
 
     async run(runOptions?: RunOptions): Promise<void> {
-      const config = resolveConfig();
+      const config = resolveConfig(undefined, runOptions?.configOverride);
 
       const server = await factory(config);
       const port =

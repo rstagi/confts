@@ -1,8 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from "vitest";
 import { z } from "zod";
 import { createServer } from "node:http";
 import fastify from "fastify";
 import express from "express";
+import { writeFileSync, mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { schema, key } from "../src/schema";
 import { startup } from "../src/startup";
 
@@ -100,6 +103,23 @@ describe("startup()", () => {
       await service.create();
       expect(receivedConfig).toEqual({ port: 3000, host: "from-options-env" });
     });
+
+    it("options.configPath loads config file", async () => {
+      const configDir = mkdtempSync(join(tmpdir(), "confts-startup-"));
+      writeFileSync(join(configDir, "config.json"), JSON.stringify({ port: 7777, host: "config-host" }));
+      try {
+        const mockServer = createMockServer();
+        let receivedConfig: unknown;
+        const service = startup(configSchema, { configPath: join(configDir, "config.json"), env: {} }, (config) => {
+          receivedConfig = config;
+          return mockServer;
+        });
+        await service.create();
+        expect(receivedConfig).toEqual({ port: 7777, host: "config-host" });
+      } finally {
+        rmSync(configDir, { recursive: true });
+      }
+    });
   });
 
   describe("create()", () => {
@@ -170,6 +190,29 @@ describe("startup()", () => {
       // PORT uses default (env vars are strings, so only testing HOST here)
       expect(receivedConfig).toEqual({ port: 3000, host: "0.0.0.0" });
     });
+
+    it("accepts resolve options that replace startup options", async () => {
+      const mockServer = createMockServer();
+      let receivedConfig: unknown;
+      const service = startup(configSchema, { override: { port: 1111 } }, (config) => {
+        receivedConfig = config;
+        return mockServer;
+      });
+      // create() options replace startup's override
+      await service.create({ override: { port: 2222 } });
+      expect(receivedConfig).toEqual({ port: 2222, host: "localhost" });
+    });
+
+    it("create options.env replaces startup env", async () => {
+      const mockServer = createMockServer();
+      let receivedConfig: unknown;
+      const service = startup(configSchema, { env: { HOST: "startup-host" } }, (config) => {
+        receivedConfig = config;
+        return mockServer;
+      });
+      await service.create({ env: { HOST: "create-host" } });
+      expect(receivedConfig).toEqual({ port: 3000, host: "create-host" });
+    });
   });
 
   describe("run()", () => {
@@ -199,6 +242,25 @@ describe("startup()", () => {
       await new Promise((r) => setTimeout(r, 10));
 
       expect(mockServer.listenOptions).toEqual({ port: 8080 });
+
+      process.emit("SIGTERM", "SIGTERM");
+      await runPromise;
+    });
+
+    it("configOverride replaces startup override", async () => {
+      const mockServer = createMockServer();
+      let receivedConfig: unknown;
+      const service = startup(configSchema, { override: { port: 1111 } }, (config) => {
+        receivedConfig = config;
+        return mockServer;
+      });
+
+      const runPromise = service.run({ configOverride: { port: 9999 } });
+
+      await new Promise((r) => setTimeout(r, 10));
+
+      expect(receivedConfig).toEqual({ port: 9999, host: "localhost" });
+      expect(mockServer.listenOptions).toEqual({ port: 9999 });
 
       process.emit("SIGTERM", "SIGTERM");
       await runPromise;
