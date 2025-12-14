@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.0] - 2025-12-14
+- doc: update README with detailed sources + toDebugObject
+- feat: detailed sources + toDebugObject()
+
 ## [0.8.1] - 2025-12-14
 - doc: add getSources to README
 
