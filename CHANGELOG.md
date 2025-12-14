@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.7.0] - 2025-12-14
+- doc: add doc field to README
+- feat: add doc field to config fields
+
 ## [0.6.0] - 2025-12-14
 - doc: update README
 - refactor: naming
