@@ -1,6 +1,6 @@
 import type { ZodTypeAny, ZodObject, z } from "zod";
 
-export type ConfigSource = "override" | "env" | "secretFile" | "file" | "initial" | "default";
+export type ConfigSource = string;
 
 export interface FieldConfig<T extends ZodTypeAny = ZodTypeAny> {
   type: T;

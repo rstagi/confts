@@ -49,5 +49,5 @@ export function resolve<S extends ConftsSchema<Record<string, unknown>>>(
     );
   }
 
-  return resolveValues(schema, { fileValues, env, secretsPath }) as InferSchema<S>;
+  return resolveValues(schema, { fileValues, env, secretsPath, configPath }) as InferSchema<S>;
 }

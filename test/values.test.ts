@@ -280,19 +280,25 @@ describe("resolveValues()", () => {
       expect(getSources(config)?.host).toBe("default");
     });
 
-    it("tracks env source", () => {
+    it("tracks env source with var name", () => {
       const s = schema({ host: field({ type: z.string(), env: "HOST" }) });
       const config = resolveValues(s, { env: { HOST: "from-env" } });
-      expect(getSources(config)?.host).toBe("env");
+      expect(getSources(config)?.host).toBe("env:HOST");
     });
 
-    it("tracks secretFile source", () => {
+    it("tracks secretFile source with path", () => {
       const s = schema({ pass: field({ type: z.string(), secretFile: secretFilePath }) });
       const config = resolveValues(s, { env: {} });
-      expect(getSources(config)?.pass).toBe("secretFile");
+      expect(getSources(config)?.pass).toBe(`secretFile:${secretFilePath}`);
     });
 
-    it("tracks file source", () => {
+    it("tracks file source with path", () => {
+      const s = schema({ port: field({ type: z.number() }) });
+      const config = resolveValues(s, { fileValues: { port: 3000 }, configPath: "./config.yaml", env: {} });
+      expect(getSources(config)?.port).toBe("file:./config.yaml");
+    });
+
+    it("tracks file source without path when not provided", () => {
       const s = schema({ port: field({ type: z.number() }) });
       const config = resolveValues(s, { fileValues: { port: 3000 }, env: {} });
       expect(getSources(config)?.port).toBe("file");
@@ -313,7 +319,7 @@ describe("resolveValues()", () => {
     it("uses dot notation for nested schemas", () => {
       const s = schema({ db: { host: field({ type: z.string(), env: "DB_HOST" }) } });
       const config = resolveValues(s, { env: { DB_HOST: "localhost" } });
-      expect(getSources(config)?.["db.host"]).toBe("env");
+      expect(getSources(config)?.["db.host"]).toBe("env:DB_HOST");
     });
 
     it("tracks multiple sources in nested schemas", () => {
@@ -324,7 +330,7 @@ describe("resolveValues()", () => {
         },
       });
       const config = resolveValues(s, { env: { DB_HOST: "localhost" } });
-      expect(getSources(config)?.["db.host"]).toBe("env");
+      expect(getSources(config)?.["db.host"]).toBe("env:DB_HOST");
       expect(getSources(config)?.["db.port"]).toBe("default");
     });
 
@@ -335,7 +341,7 @@ describe("resolveValues()", () => {
       });
       const config = resolveValues(s, { env: { HOST: "localhost" } });
       const str = config.toSourceString();
-      expect(JSON.parse(str)).toEqual({ host: "env", port: "default" });
+      expect(JSON.parse(str)).toEqual({ host: "env:HOST", port: "default" });
     });
 
     it("toSourceString() is non-enumerable", () => {
@@ -348,6 +354,54 @@ describe("resolveValues()", () => {
       expect(getSources({})).toBeUndefined();
       expect(getSources(null)).toBeUndefined();
       expect(getSources("string")).toBeUndefined();
+    });
+  });
+
+  describe("toDebugObject()", () => {
+    it("returns values with embedded sources", () => {
+      const s = schema({
+        host: field({ type: z.string(), env: "HOST" }),
+        port: field({ type: z.number(), default: 3000 }),
+      });
+      const config = resolveValues(s, { env: { HOST: "localhost" } });
+      expect(config.toDebugObject()).toEqual({
+        host: { value: "localhost", source: "env:HOST" },
+        port: { value: 3000, source: "default" },
+      });
+    });
+
+    it("handles nested schemas", () => {
+      const s = schema({
+        db: {
+          host: field({ type: z.string(), env: "DB_HOST" }),
+          port: field({ type: z.number(), default: 5432 }),
+        },
+      });
+      const config = resolveValues(s, { env: { DB_HOST: "localhost" } });
+      expect(config.toDebugObject()).toEqual({
+        db: {
+          host: { value: "localhost", source: "env:DB_HOST" },
+          port: { value: 5432, source: "default" },
+        },
+      });
+    });
+
+    it("is non-enumerable", () => {
+      const s = schema({ host: field({ type: z.string(), default: "localhost" }) });
+      const config = resolveValues(s, { env: {} });
+      expect(Object.keys(config)).not.toContain("toDebugObject");
+    });
+
+    it("redacts sensitive values", () => {
+      const s = schema({
+        host: field({ type: z.string(), default: "localhost" }),
+        password: field({ type: z.string(), default: "secret123", sensitive: true }),
+      });
+      const config = resolveValues(s, { env: {} });
+      expect(config.toDebugObject()).toEqual({
+        host: { value: "localhost", source: "default" },
+        password: { value: "[REDACTED]", source: "default" },
+      });
     });
   });
 });

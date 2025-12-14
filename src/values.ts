@@ -11,6 +11,7 @@ export interface ResolveOptions {
   env?: Record<string, string | undefined>;
   secretsPath?: string;
   override?: Record<string, unknown>;
+  configPath?: string;
 }
 
 interface KeyMeta {
@@ -39,8 +40,8 @@ export function resolveValues<S extends ConftsSchema<Record<string, unknown>>>(
   schema: S,
   options: ResolveOptions = {}
 ): InferSchema<S> {
-  const { initialValues, fileValues, env = process.env, secretsPath = "/secrets", override } = options;
-  const { value, sources } = resolveValue(schema, [], initialValues, fileValues, env, secretsPath, override);
+  const { initialValues, fileValues, env = process.env, secretsPath = "/secrets", override, configPath } = options;
+  const { value, sources } = resolveValue(schema, [], initialValues, fileValues, env, secretsPath, override, configPath);
   const result = value as InferSchema<S>;
 
   Object.defineProperty(result, "toString", {
@@ -61,6 +62,12 @@ export function resolveValues<S extends ConftsSchema<Record<string, unknown>>>(
     writable: false,
   });
 
+  Object.defineProperty(result, "toDebugObject", {
+    value: () => buildDebugObject(schema, result, sources),
+    enumerable: false,
+    writable: false,
+  });
+
   return result;
 }
 
@@ -71,13 +78,14 @@ function resolveValue(
   fileValues: Record<string, unknown> | undefined,
   env: Record<string, string | undefined>,
   secretsPath: string,
-  override: Record<string, unknown> | undefined
+  override: Record<string, unknown> | undefined,
+  configPath: string | undefined
 ): ResolveResult {
   if (isZodObject(schema)) {
     const result: Record<string, unknown> = {};
     const sources: Record<string, ConfigSource> = {};
     for (const [key, childSchema] of Object.entries(schema.shape)) {
-      const childResult = resolveValue(childSchema, [...path, key], initialValues, fileValues, env, secretsPath, override);
+      const childResult = resolveValue(childSchema, [...path, key], initialValues, fileValues, env, secretsPath, override, configPath);
       result[key] = childResult.value;
       Object.assign(sources, childResult.sources);
     }
@@ -121,24 +129,24 @@ function resolveValue(
     const envValue = loadEnv(meta.env, env);
     if (envValue !== undefined) {
       value = envValue;
-      source = "env";
+      source = `env:${meta.env}`;
     }
   }
 
   if (value === undefined && meta?.secretFile !== undefined) {
-    const secretPath = isAbsolute(meta.secretFile)
+    const secretFilePath = isAbsolute(meta.secretFile)
       ? meta.secretFile
       : join(secretsPath, meta.secretFile);
-    const secretValue = loadSecretFile(secretPath);
+    const secretValue = loadSecretFile(secretFilePath);
     if (secretValue !== undefined) {
       value = secretValue;
-      source = "secretFile";
+      source = `secretFile:${secretFilePath}`;
     }
   }
 
   if (value === undefined && fileValue !== undefined) {
     value = fileValue;
-    source = "file";
+    source = configPath ? `file:${configPath}` : "file";
   }
 
   if (value === undefined && initialValue !== undefined) {
@@ -187,6 +195,36 @@ function redactValue(schema: ZodTypeAny, value: unknown): unknown {
   }
 
   return value;
+}
+
+function buildDebugObject(
+  schema: ZodTypeAny,
+  value: unknown,
+  sources: Record<string, ConfigSource>,
+  path: string[] = []
+): unknown {
+  if (isZodObject(schema) && value && typeof value === "object") {
+    const result: Record<string, unknown> = {};
+    for (const [key, childSchema] of Object.entries(schema.shape)) {
+      result[key] = buildDebugObject(
+        childSchema,
+        (value as Record<string, unknown>)[key],
+        sources,
+        [...path, key]
+      );
+    }
+    return result;
+  }
+
+  if (isZodLiteral(schema)) {
+    return { value, source: "literal" };
+  }
+
+  const pathStr = path.join(".");
+  const meta = getMeta(schema);
+  const displayValue = meta?.sensitive ? "[REDACTED]" : value;
+
+  return { value: displayValue, source: sources[pathStr] };
 }
 
 function isZodObject(schema: ZodTypeAny): schema is ZodObject<Record<string, ZodTypeAny>> {
