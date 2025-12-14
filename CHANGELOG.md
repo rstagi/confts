@@ -1,5 +1,8 @@
 # Changelog
 
+## [0.8.0] - 2025-12-14
+- feat: expose source context for debugging
+
 ## [0.7.0] - 2025-12-14
 - doc: add doc field to README
 - feat: add doc field to config fields
