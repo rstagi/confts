@@ -66,7 +66,7 @@ describe("startup()", () => {
     it("works with (schema, factory) signature", async () => {
       const mockServer = createMockServer();
       const service = startup(configSchema, () => mockServer);
-      const server = await service.create();
+      const { server } = await service.create();
       expect(server).toBe(mockServer);
     });
 
@@ -127,7 +127,7 @@ describe("startup()", () => {
       const mockServer = createMockServer();
       const service = startup(configSchema, () => mockServer);
 
-      const server = await service.create();
+      const { server } = await service.create();
 
       expect(server).toBe(mockServer);
       expect(mockServer.listenCalled).toBe(false);
@@ -169,7 +169,7 @@ describe("startup()", () => {
         return mockServer;
       });
 
-      const server = await service.create();
+      const { server } = await service.create();
 
       expect(server).toBe(mockServer);
     });
@@ -417,7 +417,7 @@ describe("startup()", () => {
         return app;
       });
 
-      const server = await service.create();
+      const { server } = await service.create();
       expect(server).toBeDefined();
       await server.close();
     });

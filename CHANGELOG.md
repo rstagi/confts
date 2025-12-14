@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.1] - 2025-12-14
+- 0.5.1
+- chore: docs and version postscripts
+
 ## [0.5.0] - 2025-12-14
 - Add `initialValues` and `override` to resolve()
 - Refactor startup() signatures: `(schema, factory)` and `(schema, options, factory)`

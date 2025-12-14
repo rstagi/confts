@@ -24,10 +24,10 @@ export interface ResolveParams {
 }
 
 export interface Service<
-  _S extends ConftsSchema<Record<string, unknown>>,
+  S extends ConftsSchema<Record<string, unknown>>,
   T extends ServerLike,
 > {
-  create: (options?: ResolveParams) => Promise<T>;
+  create: (options?: ResolveParams) => Promise<{ server: T, config: InferSchema<S> }>;
   run: (options?: RunOptions) => Promise<void>;
 }
 
@@ -113,17 +113,18 @@ export function startup<
   };
 
   const service: Service<S, T> = {
-    async create(createOptions?: ResolveParams): Promise<T> {
+    async create(createOptions?: ResolveParams): Promise<{ server: T, config: InferSchema<S> }> {
       const config = resolveConfig(createOptions);
-      return factory(config);
+      return {
+        server: await factory(config),
+        config,
+      };
     },
 
     async run(runOptions?: RunOptions): Promise<void> {
-      const config = resolveConfig(
+      const { server, config } = await this.create(
         runOptions?.configOverride ? { override: runOptions.configOverride } : undefined
-      );
-
-      const server = await factory(config);
+      )
       const port =
         runOptions?.port ?? (config as { port?: number }).port ?? 3000;
       const host = runOptions?.host;
