@@ -13,28 +13,28 @@ npm install confts zod
 ## Quick Start
 
 ```typescript
-import { schema, field, resolve } from "confts";
+import confts from "confts";
 import { z } from "zod";
 
-const configSchema = schema({
+const configSchema = confts.schema({
   appName: "my-app", // literal value
   someKey: {
-    publishableKey: field({
+    publishableKey: confts.field({
       type: z.string().nonempty(),
       env: "MY_PUBLISHABLE_KEY",
     }),
-    secretKey: field({
+    secretKey: confts.field({
       type: z.string().nonempty(),
       secretFile: "some-secret-file-name",
       sensitive: true,
     }),
     nested: {
-      someNestedKey: field({ type: z.number(), env: "MY_VAR", default: 3000 }),
+      someNestedKey: confts.field({ type: z.number(), env: "MY_VAR", default: 3000 }),
     },
   },
 });
 
-const config = resolve(configSchema, { configPath: "./config.yaml" });
+const config = confts.resolve(configSchema, { configPath: "./config.yaml" });
 // config is fully typed
 ```
 
@@ -113,15 +113,15 @@ Pass `import.meta` to auto-run when file is executed directly:
 
 ```typescript
 // app.ts (ESM)
-import { bootstrap, schema, field } from "confts";
+import confts from "confts";
 import { z } from "zod";
 
-const configSchema = schema({
-  port: field({ type: z.number(), env: "PORT", default: 3000 }),
-  dbUrl: field({ type: z.string(), env: "DATABASE_URL" }),
+const configSchema = confts.schema({
+  port: confts.field({ type: z.number(), env: "PORT", default: 3000 }),
+  dbUrl: confts.field({ type: z.string(), env: "DATABASE_URL" }),
 });
 
-export default bootstrap(configSchema, { meta: import.meta }, async (config) => {
+export default confts.bootstrap(configSchema, { meta: import.meta }, async (config) => {
   await db.connect(config.dbUrl);
   const app = express();
   app.get("/health", (req, res) => res.send("ok"));
@@ -138,14 +138,14 @@ Pass `module` for CJS projects:
 
 ```javascript
 // app.cjs (CommonJS)
-const { bootstrap, schema, field } = require("confts");
+const confts = require("confts");
 const { z } = require("zod");
 
-const configSchema = schema({
-  port: field({ type: z.number(), env: "PORT", default: 3000 }),
+const configSchema = confts.schema({
+  port: confts.field({ type: z.number(), env: "PORT", default: 3000 }),
 });
 
-module.exports = bootstrap(configSchema, { module }, (config) => {
+module.exports = confts.bootstrap(configSchema, { module }, (config) => {
   const app = require("express")();
   return app;
 });
