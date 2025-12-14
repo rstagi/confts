@@ -62,6 +62,7 @@ field({
   secretFile: "/path",     // path to secret file
   sensitive: true,         // redact in errors
   default: "value",        // fallback value
+  doc: "Description",      // field description (uses z.describe)
 });
 ```
 
