@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.5.2] - 2025-12-14
+- 0.5.2
+- fix: return server and config from create
+
 ## [0.5.1] - 2025-12-14
 - 0.5.1
 - chore: docs and version postscripts
