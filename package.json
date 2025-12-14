@@ -13,6 +13,9 @@
       "require": "./dist/index.cjs"
     }
   },
+  "bin": {
+    "confts-start": "./dist/confts-start.js"
+  },
   "files": [
     "dist"
   ],

@@ -1,6 +1,7 @@
 export { schema, key } from "./schema";
 export { parse } from "./parser";
 export { resolve } from "./resolver";
+export { startup } from "./startup";
 export { ConfigError } from "./errors";
 export type {
   KeyConfig,
@@ -10,3 +11,4 @@ export type {
 } from "./types";
 export type { ResolveOptions } from "./resolver";
 export type { ParseOptions } from "./parser";
+export type { ServerLike, Service, RunOptions } from "./startup";

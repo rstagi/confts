@@ -99,6 +99,61 @@ key({
 });
 ```
 
+## Server Startup
+
+The `startup()` helper provides a consistent pattern for server lifecycle management with graceful shutdown.
+
+```typescript
+// app.ts
+import { startup, schema, key } from "confts";
+import { z } from "zod";
+import express from "express";
+
+const configSchema = schema({
+  port: key({ type: z.number(), env: "PORT", default: 3000 }),
+  dbUrl: key({ type: z.string(), env: "DATABASE_URL" }),
+});
+
+export default startup(configSchema, async (config) => {
+  await db.connect(config.dbUrl); // async init supported
+  const app = express();
+  app.get("/health", (req, res) => res.send("ok"));
+  return app;
+});
+```
+
+### Running with CLI
+
+```bash
+# Requires Node 24+ with native TypeScript support
+npx confts-start app.ts
+
+# Or in package.json
+"start": "confts-start app.ts"
+```
+
+### Testing
+
+```typescript
+// app.test.ts
+import service from "./app";
+
+const app = await service.create({ dbUrl: "test://..." });
+// use supertest(app) - no listen() called
+```
+
+### API
+
+`startup(schema, factory)` returns:
+- `create(overrides?)` - builds server without listening (for tests)
+- `run(options?)` - builds server, listens, handles graceful shutdown
+
+`run()` options:
+- `port` - override config port
+- `onReady` - callback when listening
+- `onShutdown` - callback on shutdown
+- `shutdownTimeout` - ms before force exit (default: 30000)
+
 ## License
 
 MIT
