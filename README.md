@@ -18,16 +18,18 @@ import { z } from "zod";
 
 const configSchema = schema({
   appName: "my-app", // literal value
-  clerk: {
+  someKey: {
     publishableKey: key({
       type: z.string().nonempty(),
-      env: "CLERK_PUBLISHABLE_KEY",
-      secretFile: "/secrets/clerk-key",
+      env: "MY_PUBLISHABLE_KEY",
+    }),
+    secretKey: key({
+      type: z.string().nonempty(),
+      secretFile: "some-secret-file-name",
       sensitive: true,
-      default: "pk_test_xxx",
     }),
     nested: {
-      port: key({ type: z.number(), env: "PORT", default: 3000 }),
+      someNestedKey: key({ type: z.number(), env: "MY_VAR", default: 3000 }),
     },
   },
 });
