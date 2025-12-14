@@ -101,14 +101,38 @@ import { resolveValues, getSources } from "confts";
 
 const config = resolveValues(schema, options);
 const sources = getSources(config);
-// { host: "env", port: "default", "db.password": "secretFile" }
+// { host: "env:HOST", port: "default", "db.password": "secretFile:/secrets/db_pass" }
 
 // Or use toSourceString() for logging
 console.log(config.toSourceString());
-// '{"host":"env","port":"default","db.password":"secretFile"}'
+// '{"host":"env:HOST","port":"default","db.password":"secretFile:/secrets/db_pass"}'
 ```
 
-Source types: `"override"` | `"env"` | `"secretFile"` | `"file"` | `"initial"` | `"default"`
+Source formats:
+- `"override"` - from override option
+- `"env:VAR_NAME"` - from environment variable
+- `"secretFile:/path/to/file"` - from secret file
+- `"file:/path/to/config.yaml"` - from config file
+- `"initial"` - from initialValues option
+- `"default"` - from field default
+
+### `toDebugObject()`
+
+Get config values with embedded source info (useful for debugging):
+
+```typescript
+const config = resolveValues(schema, options);
+console.log(config.toDebugObject());
+// {
+//   host: { value: "localhost", source: "env:HOST" },
+//   db: {
+//     port: { value: 5432, source: "default" },
+//     password: { value: "[REDACTED]", source: "secretFile:/secrets/db_pass" }
+//   }
+// }
+```
+
+Sensitive values are automatically redacted.
 
 ## Sensitive Values
 
