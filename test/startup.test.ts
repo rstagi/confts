@@ -3,7 +3,7 @@ import { z } from "zod";
 import { schema, key } from "../src/schema";
 import { startup } from "../src/startup";
 
-// Mock server implementation
+// Mock server implementation (callback-based, Express-style)
 function createMockServer() {
   const listeners: Array<() => void> = [];
   return {
@@ -16,6 +16,24 @@ function createMockServer() {
       if (cb) listeners.push(cb);
       // Simulate async ready
       setTimeout(() => listeners.forEach((l) => l()), 0);
+    },
+    close(cb?: (err?: Error) => void) {
+      this.closeCalled = true;
+      if (cb) cb();
+    },
+  };
+}
+
+// Mock server implementation (Promise-based, Fastify-style)
+function createPromiseMockServer() {
+  return {
+    listenCalled: false,
+    listenOptions: null as { port: number; host?: string } | null,
+    closeCalled: false,
+    listen(options: { port: number; host?: string }): Promise<string> {
+      this.listenCalled = true;
+      this.listenOptions = options;
+      return Promise.resolve(`${options.host ?? "127.0.0.1"}:${options.port}`);
     },
     close(cb?: (err?: Error) => void) {
       this.closeCalled = true;
@@ -183,6 +201,43 @@ describe("startup()", () => {
       await runPromise;
 
       expect(mockServer.closeCalled).toBe(true);
+    });
+
+    it("handles Promise-based listen (Fastify-style) with host", async () => {
+      const mockServer = createPromiseMockServer();
+      const service = startup(configSchema, () => mockServer);
+      const onReady = vi.fn();
+
+      const runPromise = service.run({ host: "0.0.0.0", onReady });
+
+      await new Promise((r) => setTimeout(r, 20));
+
+      expect(mockServer.listenCalled).toBe(true);
+      expect(mockServer.listenOptions).toEqual({ port: 3000, host: "0.0.0.0" });
+      expect(onReady).toHaveBeenCalledOnce();
+
+      process.emit("SIGTERM", "SIGTERM");
+      await runPromise;
+    });
+
+    it("rejects when Promise-based listen fails", async () => {
+      const mockServer = {
+        listenCalled: false,
+        closeCalled: false,
+        listen(): Promise<string> {
+          this.listenCalled = true;
+          return Promise.reject(new Error("EADDRINUSE"));
+        },
+        close(cb?: (err?: Error) => void) {
+          this.closeCalled = true;
+          if (cb) cb();
+        },
+      };
+      const service = startup(configSchema, () => mockServer);
+
+      await expect(service.run({ host: "0.0.0.0" })).rejects.toThrow(
+        "EADDRINUSE"
+      );
     });
   });
 

@@ -3,8 +3,16 @@ import { fileURLToPath } from "node:url";
 import { resolve } from "./resolver";
 import type { ConftsSchema, InferSchema } from "./types";
 
+export interface ListenOptions {
+  port: number;
+  host?: string;
+}
+
 export interface ServerLike {
-  listen(port: number, callback?: () => void): void;
+  listen(
+    portOrOptions: number | ListenOptions,
+    callback?: () => void
+  ): void | Promise<unknown>;
   close(callback?: (err?: Error) => void): void;
 }
 
@@ -18,6 +26,7 @@ export interface Service<
 
 export interface RunOptions {
   port?: number;
+  host?: string;
   onReady?: () => void;
   onShutdown?: () => void;
   shutdownTimeout?: number;
@@ -69,8 +78,9 @@ export function startup<
       const server = await factory(config);
       const port =
         runOptions?.port ?? (config as { port?: number }).port ?? 3000;
+      const host = runOptions?.host;
 
-      return new Promise<void>((resolvePromise) => {
+      return new Promise<void>((resolvePromise, rejectPromise) => {
         const shutdown = () => {
           server.close(() => {
             runOptions?.onShutdown?.();
@@ -81,9 +91,20 @@ export function startup<
         process.once("SIGTERM", shutdown);
         process.once("SIGINT", shutdown);
 
-        server.listen(port, () => {
+        const listenArg: number | ListenOptions = host !== undefined ? { port, host } : port;
+        const maybePromise = server.listen(listenArg, () => {
           runOptions?.onReady?.();
         });
+
+        if (maybePromise && typeof maybePromise.then === "function") {
+          maybePromise
+            .then(() => {
+              runOptions?.onReady?.();
+            })
+            .catch((err: Error) => {
+              rejectPromise(err);
+            });
+        }
       });
     },
   };
