@@ -1,9 +1,10 @@
 export { schema, field } from "./schema";
 export { resolve } from "./resolve";
-export { resolveValues } from "./values";
+export { resolveValues, getSources } from "./values";
 export { bootstrap } from "./bootstrap";
 export { ConfigError } from "./errors";
 export type {
+  ConfigSource,
   FieldConfig,
   SchemaDefinition,
   ConftsSchema,

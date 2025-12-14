@@ -3,7 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { loadEnv } from "./loaders/env";
 import { loadSecretFile } from "./loaders/secretFile";
 import { ConfigError, formatValue } from "./errors";
-import type { ConftsSchema, InferSchema } from "./types";
+import type { ConfigSource, ConftsSchema, InferSchema } from "./types";
 
 export interface ResolveOptions {
   initialValues?: Record<string, unknown>;
@@ -20,15 +20,43 @@ interface KeyMeta {
   default?: unknown;
 }
 
+interface ResolveResult {
+  value: unknown;
+  source: ConfigSource | null;
+  sources: Record<string, ConfigSource>;
+}
+
+const SOURCES_SYMBOL = Symbol("confts.sources");
+
+export function getSources(config: unknown): Record<string, ConfigSource> | undefined {
+  if (config && typeof config === "object") {
+    return (config as Record<symbol, unknown>)[SOURCES_SYMBOL] as Record<string, ConfigSource> | undefined;
+  }
+  return undefined;
+}
+
 export function resolveValues<S extends ConftsSchema<Record<string, unknown>>>(
   schema: S,
   options: ResolveOptions = {}
 ): InferSchema<S> {
   const { initialValues, fileValues, env = process.env, secretsPath = "/secrets", override } = options;
-  const result = resolveValue(schema, [], initialValues, fileValues, env, secretsPath, override) as InferSchema<S>;
+  const { value, sources } = resolveValue(schema, [], initialValues, fileValues, env, secretsPath, override);
+  const result = value as InferSchema<S>;
 
   Object.defineProperty(result, "toString", {
     value: () => JSON.stringify(redactValue(schema, result), null, 2),
+    enumerable: false,
+    writable: false,
+  });
+
+  Object.defineProperty(result, SOURCES_SYMBOL, {
+    value: sources,
+    enumerable: false,
+    writable: false,
+  });
+
+  Object.defineProperty(result, "toSourceString", {
+    value: () => JSON.stringify(getSources(result)),
     enumerable: false,
     writable: false,
   });
@@ -44,17 +72,20 @@ function resolveValue(
   env: Record<string, string | undefined>,
   secretsPath: string,
   override: Record<string, unknown> | undefined
-): unknown {
+): ResolveResult {
   if (isZodObject(schema)) {
     const result: Record<string, unknown> = {};
+    const sources: Record<string, ConfigSource> = {};
     for (const [key, childSchema] of Object.entries(schema.shape)) {
-      result[key] = resolveValue(childSchema, [...path, key], initialValues, fileValues, env, secretsPath, override);
+      const childResult = resolveValue(childSchema, [...path, key], initialValues, fileValues, env, secretsPath, override);
+      result[key] = childResult.value;
+      Object.assign(sources, childResult.sources);
     }
-    return result;
+    return { value: result, source: null, sources };
   }
 
   if (isZodLiteral(schema)) {
-    return getLiteralValue(schema);
+    return { value: getLiteralValue(schema), source: null, sources: {} };
   }
 
   const meta = getMeta(schema);
@@ -79,15 +110,18 @@ function resolveValue(
 
   // Resolution priority: override > env > secretFile > fileValues > initialValues > default
   let value: unknown;
+  let source: ConfigSource | undefined;
 
   if (overrideValue !== undefined) {
     value = overrideValue;
+    source = "override";
   }
 
   if (value === undefined && meta?.env !== undefined) {
     const envValue = loadEnv(meta.env, env);
     if (envValue !== undefined) {
       value = envValue;
+      source = "env";
     }
   }
 
@@ -98,19 +132,23 @@ function resolveValue(
     const secretValue = loadSecretFile(secretPath);
     if (secretValue !== undefined) {
       value = secretValue;
+      source = "secretFile";
     }
   }
 
   if (value === undefined && fileValue !== undefined) {
     value = fileValue;
+    source = "file";
   }
 
   if (value === undefined && initialValue !== undefined) {
     value = initialValue;
+    source = "initial";
   }
 
   if (value === undefined && meta?.default !== undefined) {
     value = meta.default;
+    source = "default";
   }
 
   if (value === undefined) {
@@ -131,7 +169,7 @@ function resolveValue(
     );
   }
 
-  return result.data;
+  return { value: result.data, source: source!, sources: { [pathStr]: source! } };
 }
 
 function redactValue(schema: ZodTypeAny, value: unknown): unknown {

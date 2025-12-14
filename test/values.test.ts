@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { z } from "zod";
 import { schema, field } from "../src/schema";
-import { resolveValues } from "../src/values";
+import { resolveValues, getSources } from "../src/values";
 import { ConfigError } from "../src/errors";
 
 describe("resolveValues()", () => {
@@ -263,6 +263,91 @@ describe("resolveValues()", () => {
       const str = config.toString();
       expect(str).toContain("localhost");
       expect(str).toContain("3000");
+    });
+  });
+
+  describe("source tracking", () => {
+    it("getSources() returns sources", () => {
+      const s = schema({ host: field({ type: z.string(), default: "localhost" }) });
+      const config = resolveValues(s, { env: {} });
+      expect(getSources(config)).toBeDefined();
+      expect(Object.keys(config)).not.toContain("_sources");
+    });
+
+    it("tracks default source", () => {
+      const s = schema({ host: field({ type: z.string(), default: "localhost" }) });
+      const config = resolveValues(s, { env: {} });
+      expect(getSources(config)?.host).toBe("default");
+    });
+
+    it("tracks env source", () => {
+      const s = schema({ host: field({ type: z.string(), env: "HOST" }) });
+      const config = resolveValues(s, { env: { HOST: "from-env" } });
+      expect(getSources(config)?.host).toBe("env");
+    });
+
+    it("tracks secretFile source", () => {
+      const s = schema({ pass: field({ type: z.string(), secretFile: secretFilePath }) });
+      const config = resolveValues(s, { env: {} });
+      expect(getSources(config)?.pass).toBe("secretFile");
+    });
+
+    it("tracks file source", () => {
+      const s = schema({ port: field({ type: z.number() }) });
+      const config = resolveValues(s, { fileValues: { port: 3000 }, env: {} });
+      expect(getSources(config)?.port).toBe("file");
+    });
+
+    it("tracks initial source", () => {
+      const s = schema({ val: field({ type: z.string() }) });
+      const config = resolveValues(s, { initialValues: { val: "initial" }, env: {} });
+      expect(getSources(config)?.val).toBe("initial");
+    });
+
+    it("tracks override source", () => {
+      const s = schema({ val: field({ type: z.string(), default: "default" }) });
+      const config = resolveValues(s, { override: { val: "overridden" }, env: {} });
+      expect(getSources(config)?.val).toBe("override");
+    });
+
+    it("uses dot notation for nested schemas", () => {
+      const s = schema({ db: { host: field({ type: z.string(), env: "DB_HOST" }) } });
+      const config = resolveValues(s, { env: { DB_HOST: "localhost" } });
+      expect(getSources(config)?.["db.host"]).toBe("env");
+    });
+
+    it("tracks multiple sources in nested schemas", () => {
+      const s = schema({
+        db: {
+          host: field({ type: z.string(), env: "DB_HOST" }),
+          port: field({ type: z.number(), default: 5432 }),
+        },
+      });
+      const config = resolveValues(s, { env: { DB_HOST: "localhost" } });
+      expect(getSources(config)?.["db.host"]).toBe("env");
+      expect(getSources(config)?.["db.port"]).toBe("default");
+    });
+
+    it("toSourceString() returns JSON of sources", () => {
+      const s = schema({
+        host: field({ type: z.string(), env: "HOST" }),
+        port: field({ type: z.number(), default: 3000 }),
+      });
+      const config = resolveValues(s, { env: { HOST: "localhost" } });
+      const str = config.toSourceString();
+      expect(JSON.parse(str)).toEqual({ host: "env", port: "default" });
+    });
+
+    it("toSourceString() is non-enumerable", () => {
+      const s = schema({ host: field({ type: z.string(), default: "localhost" }) });
+      const config = resolveValues(s, { env: {} });
+      expect(Object.keys(config)).not.toContain("toSourceString");
+    });
+
+    it("getSources() returns undefined for non-config objects", () => {
+      expect(getSources({})).toBeUndefined();
+      expect(getSources(null)).toBeUndefined();
+      expect(getSources("string")).toBeUndefined();
     });
   });
 });
