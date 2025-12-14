@@ -23,7 +23,9 @@ try {
     .trim()
     .split("\n")
     .filter(Boolean)
-    .map((line) => line.replace(/^[a-f0-9]+ /, "- "));
+    .map((line) => line.replace(/^[a-f0-9]+ /, ""))
+    .filter((msg) => !/^\d+\.\d+\.\d+$/.test(msg))
+    .map((msg) => `- ${msg}`);
 } catch {
   // No previous tag, get all commits
   commits = execSync("git log --oneline --no-decorate", {
@@ -33,7 +35,9 @@ try {
     .trim()
     .split("\n")
     .filter(Boolean)
-    .map((line) => line.replace(/^[a-f0-9]+ /, "- "));
+    .map((line) => line.replace(/^[a-f0-9]+ /, ""))
+    .filter((msg) => !/^\d+\.\d+\.\d+$/.test(msg))
+    .map((msg) => `- ${msg}`);
 }
 
 const date = new Date().toISOString().split("T")[0];
