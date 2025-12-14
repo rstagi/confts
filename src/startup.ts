@@ -14,7 +14,7 @@ export interface ServerLike {
 }
 
 export interface Service<
-  S extends ConftsSchema<Record<string, unknown>>,
+  _S extends ConftsSchema<Record<string, unknown>>,
   T extends ServerLike,
 > {
   create: () => Promise<T>;
