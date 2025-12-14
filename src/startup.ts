@@ -100,7 +100,7 @@ export function startup<
   const options: StartupOptions = isOptionsSignature ? factoryOrOptions : {};
   const factory = isOptionsSignature ? maybeFactory! : factoryOrOptions;
 
-  const resolveConfig = (overrides?: ResolveParams, overrideOnly?: Record<string, unknown>) => {
+  const resolveConfig = (overrides?: ResolveParams) => {
     const params = { ...options, ...overrides };
     const fileValues = params.configPath ? loadConfigFile(params.configPath) : undefined;
     return resolve(configSchema, {
@@ -108,7 +108,7 @@ export function startup<
       fileValues,
       env: params.env ?? process.env,
       secretsPath: params.secretsPath,
-      override: overrideOnly ?? params.override,
+      override: params.override,
     }) as InferSchema<S>;
   };
 
@@ -119,7 +119,9 @@ export function startup<
     },
 
     async run(runOptions?: RunOptions): Promise<void> {
-      const config = resolveConfig(undefined, runOptions?.configOverride);
+      const config = resolveConfig(
+        runOptions?.configOverride ? { override: runOptions.configOverride } : undefined
+      );
 
       const server = await factory(config);
       const port =
