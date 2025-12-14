@@ -85,4 +85,26 @@ describe("schema()", () => {
       sensitive: true,
     });
   });
+
+  it("stores doc as z.describe()", () => {
+    const s = schema({
+      host: field({
+        type: z.string(),
+        doc: "Database host",
+      }),
+    });
+    expect(s.shape.host.description).toBe("Database host");
+  });
+
+  it("doc works together with other metadata", () => {
+    const s = schema({
+      host: field({
+        type: z.string(),
+        env: "DB_HOST",
+        doc: "Database host",
+      }),
+    });
+    expect(s.shape.host.description).toBe("Database host");
+    expect(s.shape.host.meta()).toMatchObject({ env: "DB_HOST" });
+  });
 });

@@ -24,13 +24,14 @@ function buildZodShape(definition: Record<string, unknown>): Record<string, ZodT
 
   for (const [k, v] of Object.entries(definition)) {
     if (isMarkedField(v)) {
-      const { type, env, secretFile, sensitive, default: defaultValue } = v;
+      const { type, env, secretFile, sensitive, default: defaultValue, doc } = v;
       const meta: Record<string, unknown> = {};
       if (env !== undefined) meta.env = env;
       if (secretFile !== undefined) meta.secretFile = secretFile;
       if (sensitive !== undefined) meta.sensitive = sensitive;
       if (defaultValue !== undefined) meta.default = defaultValue;
-      shape[k] = Object.keys(meta).length > 0 ? type.meta(meta) : type;
+      const described = doc !== undefined ? type.describe(doc) : type;
+      shape[k] = Object.keys(meta).length > 0 ? described.meta(meta) : described;
     } else if (isPrimitive(v)) {
       shape[k] = z.literal(v);
     } else if (typeof v === "object" && v !== null) {

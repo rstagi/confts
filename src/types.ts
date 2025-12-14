@@ -6,6 +6,7 @@ export interface FieldConfig<T extends ZodTypeAny = ZodTypeAny> {
   secretFile?: string;
   sensitive?: boolean;
   default?: unknown;
+  doc?: string;
 }
 
 export type SchemaDefinition = {
