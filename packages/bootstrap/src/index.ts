@@ -1,6 +1,6 @@
-import { resolve as resolvePath, extname } from "node:path";
+import { resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
-import { resolveValues, getLoader, getSupportedExtensions, ConfigError } from "confts";
+import { resolve } from "confts";
 import type { ConftsSchema, InferSchema } from "confts";
 
 export interface ListenOptions {
@@ -83,10 +83,9 @@ export function bootstrap<
 
   const resolveConfig = (overrides?: ResolveParams) => {
     const params = { ...options, ...overrides };
-    const fileValues = params.configPath ? loadConfigFile(params.configPath) : undefined;
-    return resolveValues(configSchema, {
+    return resolve(configSchema, {
       initialValues: params.initialValues,
-      fileValues,
+      configPath: params.configPath,
       env: params.env ?? process.env,
       secretsPath: params.secretsPath,
       override: params.override,
@@ -169,20 +168,4 @@ function resolveAutorunOptions<T>(
   return typeof autorun.runOptions === "function"
     ? autorun.runOptions(config)
     : autorun.runOptions;
-}
-
-function loadConfigFile(configPath: string): Record<string, unknown> | undefined {
-  const ext = extname(configPath).toLowerCase();
-  const loader = getLoader(ext);
-
-  if (!loader) {
-    const supported = getSupportedExtensions().join(", ");
-    throw new ConfigError(
-      `Unsupported config file extension: ${ext}. Supported: ${supported || "none"}. Install @confts/yaml-loader for YAML support.`,
-      configPath,
-      false
-    );
-  }
-
-  return loader(configPath);
 }

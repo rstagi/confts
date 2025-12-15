@@ -6,16 +6,18 @@ import type { ConftsSchema, InferSchema } from "./types";
 import { DiagnosticsCollector } from "./diagnostics";
 
 export interface ResolveOptions {
+  initialValues?: Record<string, unknown>;
   configPath?: string;
   env?: Record<string, string | undefined>;
   secretsPath?: string;
+  override?: Record<string, unknown>;
 }
 
 export function resolve<S extends ConftsSchema<Record<string, unknown>>>(
   schema: S,
   options: ResolveOptions = {}
 ): InferSchema<S> {
-  const { env = process.env, secretsPath = "/secrets" } = options;
+  const { env = process.env, secretsPath = "/secrets", initialValues, override } = options;
   const collector = new DiagnosticsCollector();
 
   // Build candidates list for diagnostics
@@ -25,42 +27,39 @@ export function resolve<S extends ConftsSchema<Record<string, unknown>>>(
 
   const configPath = options.configPath ?? env.CONFIG_PATH;
 
-  if (!configPath) {
-    collector.addConfigPath(null, candidates, "no config path found");
-    throw new ConfigError(
-      "No config path provided. Set configPath option or CONFIG_PATH env var.",
-      "CONFIG_PATH",
-      false
-    );
+  let fileValues: Record<string, unknown> | undefined;
+
+  if (configPath) {
+    const reason = options.configPath ? "picked from configPath option" : "picked from CONFIG_PATH env";
+    collector.addConfigPath(configPath, candidates, reason);
+
+    const ext = extname(configPath).toLowerCase();
+    const loader = getLoader(ext);
+
+    if (!loader) {
+      const supported = getSupportedExtensions().join(", ");
+      collector.addLoader(ext, false, `unsupported extension, supported: ${supported || "none"}`);
+      throw new ConfigError(
+        `Unsupported config file extension: ${ext}. Supported: ${supported || "none"}. Install @confts/yaml-loader for YAML support.`,
+        configPath,
+        false
+      );
+    }
+
+    collector.addLoader(ext, true);
+
+    fileValues = loader(configPath);
+
+    if (fileValues === undefined) {
+      throw new ConfigError(
+        `Config file not found: ${configPath}`,
+        configPath,
+        false
+      );
+    }
+  } else {
+    collector.addConfigPath(null, candidates, "no config path, skipping file loading");
   }
 
-  const reason = options.configPath ? "picked from configPath option" : "picked from CONFIG_PATH env";
-  collector.addConfigPath(configPath, candidates, reason);
-
-  const ext = extname(configPath).toLowerCase();
-  const loader = getLoader(ext);
-
-  if (!loader) {
-    const supported = getSupportedExtensions().join(", ");
-    collector.addLoader(ext, false, `unsupported extension, supported: ${supported || "none"}`);
-    throw new ConfigError(
-      `Unsupported config file extension: ${ext}. Supported: ${supported || "none"}. Install @confts/yaml-loader for YAML support.`,
-      configPath,
-      false
-    );
-  }
-
-  collector.addLoader(ext, true);
-
-  const fileValues = loader(configPath);
-
-  if (fileValues === undefined) {
-    throw new ConfigError(
-      `Config file not found: ${configPath}`,
-      configPath,
-      false
-    );
-  }
-
-  return resolveValues(schema, { fileValues, env, secretsPath, configPath, _collector: collector }) as InferSchema<S>;
+  return resolveValues(schema, { initialValues, fileValues, env, secretsPath, override, configPath, _collector: collector }) as InferSchema<S>;
 }

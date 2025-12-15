@@ -67,10 +67,50 @@ describe("resolve()", () => {
       expect(resolve(s, { env: { CONFIG_PATH: configPath } })).toEqual({ value: "from-env-path" });
     });
 
-    it("throws if no configPath and CONFIG_PATH not set", () => {
+    it("works without configPath when all values have defaults", () => {
+      const s = schema({ key: field({ type: z.string(), default: "default-val" }) });
+      expect(resolve(s, { env: {} })).toEqual({ key: "default-val" });
+    });
+
+    it("throws if no configPath and required field has no value", () => {
       const s = schema({ key: field({ type: z.string() }) });
       expect(() => resolve(s, { env: {} })).toThrow(ConfigError);
-      expect(() => resolve(s, { env: {} })).toThrow(/CONFIG_PATH/);
+    });
+  });
+
+  describe("initialValues", () => {
+    it("passes initialValues to resolver", () => {
+      const s = schema({ host: field({ type: z.string() }) });
+      expect(resolve(s, { initialValues: { host: "initial-host" }, env: {} })).toEqual({
+        host: "initial-host",
+      });
+    });
+
+    it("file values override initialValues", () => {
+      const configPath = join(tempDir, "initial-override.json");
+      writeFileSync(configPath, '{"host":"from-file"}');
+      const s = schema({ host: field({ type: z.string() }) });
+      expect(resolve(s, { configPath, initialValues: { host: "initial" }, env: {} })).toEqual({
+        host: "from-file",
+      });
+    });
+  });
+
+  describe("override", () => {
+    it("passes override to resolver", () => {
+      const s = schema({ host: field({ type: z.string(), default: "default" }) });
+      expect(resolve(s, { override: { host: "overridden" }, env: {} })).toEqual({
+        host: "overridden",
+      });
+    });
+
+    it("override beats file and env values", () => {
+      const configPath = join(tempDir, "override-test.json");
+      writeFileSync(configPath, '{"host":"from-file"}');
+      const s = schema({ host: field({ type: z.string(), env: "HOST" }) });
+      expect(resolve(s, { configPath, override: { host: "overridden" }, env: { HOST: "from-env" } })).toEqual({
+        host: "overridden",
+      });
     });
   });
 
