@@ -1,5 +1,11 @@
 # confts
 
+## 0.9.12
+
+### Patch Changes
+
+- 502a637: Update README
+
 ## 0.9.11
 
 ### Patch Changes
