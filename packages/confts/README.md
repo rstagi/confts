@@ -190,13 +190,15 @@ config.toSourceString();
 config.toDebugObject();
 // {
 //   config: {
-//     "db.host": { value: "localhost", source: "env:DB_HOST" },
-//     "db.port": { value: 5432, source: "default" }
+//     "db": {
+//        "host": { value: "localhost", source: "env:DB_HOST" },
+//        "port": { value: 5432, source: "default" }
+//     }
 //   }
 // }
 
 config.toDebugObject({ includeDiagnostics: true });
-// includes diagnostics array with resolution events
+// includes diagnostics array with resolution events, see below
 ```
 
 ### Diagnostics
@@ -334,6 +336,18 @@ Check `configPath` option or `CONFIG_PATH` env var. JSON loader returns `undefin
 - Check `secretFile` path is correct
 - Default secrets base path is `/secrets`
 - Use `secretsPath` option in resolve to change base path
+
+## Advanced Usage
+
+All Zod features work in field types - `.coerce`, `.nonempty()`, `.min()`, `.transform()`, etc. Validation is fully delegated to Zod, so you can use any schema features. The only exception is `.meta()` which confts uses internally for field metadata and will be overridden.
+
+```typescript
+schema({
+  port: field({ type: z.coerce.number().min(1).max(65535), env: "PORT" }),
+  tags: field({ type: z.array(z.string()).nonempty(), default: ["default"] }),
+  email: field({ type: z.string().email(), env: "ADMIN_EMAIL" }),
+});
+```
 
 ## API Reference
 

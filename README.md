@@ -7,6 +7,7 @@ Dev-friendly TypeScript config library wrapping Zod with multi-source value reso
 ## Features
 
 - Type-safe config with Zod validation
+- No dependencies (besides Zod as a peer dependency)
 - Multi-source value resolution (env vars, secret files, config files)
 - JSON support built-in, YAML via optional package
 - Sensitive value redaction in errors and logs
@@ -46,7 +47,9 @@ const config = resolve(configSchema, { configPath: "./config.json" });
 
 ## Bootstrap
 
-Server lifecycle management with graceful shutdown.
+Have you ever struggled in properly loading the configuration at server startup and testing?
+
+Bootstrap automatically abstracts all that for you by providing server lifecycle management with graceful shutdown, with clean configuration management and override.
 
 ```bash
 npm install @confts/bootstrap
@@ -84,8 +87,7 @@ export default bootstrap(
 ```typescript
 import service from "./app";
 
-const { server } = await service.create({ override: { port: 0 } });
-// use supertest(server) - no listen() called
+const { server } = await service.create({ override: { dbUrl: 'localhost:5432' } });
 ```
 
 See [@confts/bootstrap README](packages/bootstrap/README.md) for details.

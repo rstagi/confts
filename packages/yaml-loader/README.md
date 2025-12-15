@@ -7,10 +7,8 @@ YAML file support for confts.
 ## Install
 
 ```bash
-npm install @confts/yaml-loader
+npm install confts @confts/yaml-loader
 ```
-
-Requires `confts` as peer dependency.
 
 ## Usage
 

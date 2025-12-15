@@ -7,10 +7,9 @@ Server lifecycle management with graceful shutdown for confts.
 ## Install
 
 ```bash
-npm install @confts/bootstrap
+npm install confts @confts/bootstrap
 ```
 
-Requires `confts` as peer dependency.
 
 ## Basic Usage
 
