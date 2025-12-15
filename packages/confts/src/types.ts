@@ -60,3 +60,25 @@ export type InferSchema<S> = S extends ConftsSchema<infer D>
   : S extends ZodObject<infer _Shape>
     ? z.infer<S>
     : never;
+
+/** Options for toDebugObject */
+export interface DebugObjectOptions {
+  includeDiagnostics?: boolean;
+}
+
+/** Return type of toDebugObject */
+export interface DebugObject {
+  config: Record<string, unknown>;
+  diagnostics?: DiagnosticEvent[];
+}
+
+/** Helper methods attached to resolved config */
+export interface ConfigMethods {
+  toString(): string;
+  toSourceString(): string;
+  getDiagnostics(): DiagnosticEvent[] | undefined;
+  toDebugObject(options?: DebugObjectOptions): DebugObject;
+}
+
+/** Resolved config with data + helper methods */
+export type ResolvedConfig<S> = InferSchema<S> & ConfigMethods;

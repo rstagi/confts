@@ -3,7 +3,7 @@ import { isAbsolute, join } from "node:path";
 import { loadEnv } from "./loaders/env";
 import { loadSecretFile } from "./loaders/secretFile";
 import { ConfigError, formatValue } from "./errors";
-import type { ConfigSource, ConftsSchema, InferSchema, DiagnosticEvent } from "./types";
+import type { ConfigSource, ConftsSchema, InferSchema, DiagnosticEvent, ResolvedConfig } from "./types";
 import { DiagnosticsCollector } from "./diagnostics";
 
 export interface ResolveOptions {
@@ -50,11 +50,11 @@ export function getDiagnostics(config: unknown): DiagnosticEvent[] | undefined {
 export function resolveValues<S extends ConftsSchema<Record<string, unknown>>>(
   schema: S,
   options: ResolveOptions = {}
-): InferSchema<S> {
+): ResolvedConfig<S> {
   const { initialValues, fileValues, env = process.env, secretsPath = "/secrets", override, configPath, _collector } = options;
   const collector = _collector ?? new DiagnosticsCollector();
   const { value, sources } = resolveValue(schema, [], initialValues, fileValues, env, secretsPath, override, configPath, collector);
-  const result = value as InferSchema<S>;
+  const result = value as ResolvedConfig<S>;
 
   Object.defineProperty(result, "toString", {
     value: () => JSON.stringify(redactValue(schema, result), null, 2),

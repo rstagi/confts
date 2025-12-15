@@ -12,6 +12,10 @@ export type {
   SchemaDefinition,
   ConftsSchema,
   InferSchema,
+  ResolvedConfig,
+  ConfigMethods,
+  DebugObject,
+  DebugObjectOptions,
 } from "./types";
 
 // Loader registry

@@ -1,4 +1,4 @@
-import { describe, it, expectTypeOf } from "vitest";
+import { describe, it, expect, expectTypeOf } from "vitest";
 import { z } from "zod";
 import { schema, field } from "../src/schema";
 import { resolve } from "../src/resolve";
@@ -100,6 +100,24 @@ describe("type inference", () => {
       });
       type ResolveResult = ReturnType<typeof resolve<typeof s>>;
       expectTypeOf<ResolveResult>().toMatchTypeOf<{ host: string; port: number }>();
+    });
+
+    it("exposes helper methods on resolved config (type-only test)", () => {
+      const s = schema({
+        host: field({ type: z.string(), default: "localhost" }),
+      });
+
+      // This function tests types at compile time
+      // If the methods aren't on the type, tsc will fail
+      function typeTest(config: ReturnType<typeof resolve<typeof s>>) {
+        const _sourceStr: string = config.toSourceString();
+        const _diagnostics = config.getDiagnostics();
+        const _debugObj = config.toDebugObject();
+        const _debugObjWithDiag = config.toDebugObject({ includeDiagnostics: true });
+      }
+
+      // Dummy assertion to make test pass at runtime
+      expect(typeTest).toBeDefined();
     });
   });
 });

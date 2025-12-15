@@ -2,7 +2,7 @@ import { extname } from "node:path";
 import { getLoader, getSupportedExtensions } from "./loader-registry";
 import { resolveValues } from "./values";
 import { ConfigError } from "./errors";
-import type { ConftsSchema, InferSchema } from "./types";
+import type { ConftsSchema, ResolvedConfig } from "./types";
 import { DiagnosticsCollector } from "./diagnostics";
 
 export interface ResolveOptions {
@@ -16,7 +16,7 @@ export interface ResolveOptions {
 export function resolve<S extends ConftsSchema<Record<string, unknown>>>(
   schema: S,
   options: ResolveOptions = {}
-): InferSchema<S> {
+): ResolvedConfig<S> {
   const { env = process.env, secretsPath = "/secrets", initialValues, override } = options;
   const collector = new DiagnosticsCollector();
 
@@ -61,5 +61,5 @@ export function resolve<S extends ConftsSchema<Record<string, unknown>>>(
     collector.addConfigPath(null, candidates, "no config path, skipping file loading");
   }
 
-  return resolveValues(schema, { initialValues, fileValues, env, secretsPath, override, configPath, _collector: collector }) as InferSchema<S>;
+  return resolveValues(schema, { initialValues, fileValues, env, secretsPath, override, configPath, _collector: collector });
 }

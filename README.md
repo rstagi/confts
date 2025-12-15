@@ -106,9 +106,11 @@ Load and validate config:
 
 ```typescript
 const config = resolve(schema, {
-  configPath: "./config.yaml", // or set CONFIG_PATH env
+  configPath: "./config.yaml", // or set CONFIG_PATH env (optional)
   env: process.env,            // custom env (default: process.env)
   secretsPath: "/secrets",     // base path for secret files
+  initialValues: { port: 8080 }, // low-priority defaults
+  override: { host: "prod.example.com" }, // highest priority overrides
 });
 ```
 
@@ -138,23 +140,51 @@ Source formats:
 - `"initial"` - from initialValues option
 - `"default"` - from field default
 
-### `toDebugObject()`
+### `toDebugObject(options?)`
 
 Get config values with embedded source info (useful for debugging):
 
 ```typescript
-const config = resolveValues(schema, options);
+const config = resolve(schema, options);
 console.log(config.toDebugObject());
 // {
-//   host: { value: "localhost", source: "env:HOST" },
-//   db: {
-//     port: { value: 5432, source: "default" },
-//     password: { value: "[REDACTED]", source: "secretFile:/secrets/db_pass" }
+//   config: {
+//     host: { value: "localhost", source: "env:HOST" },
+//     db: {
+//       port: { value: 5432, source: "default" },
+//       password: { value: "[REDACTED]", source: "secretFile:/secrets/db_pass" }
+//     }
 //   }
 // }
+
+// Include diagnostics for deeper debugging
+console.log(config.toDebugObject({ includeDiagnostics: true }));
+// { config: {...}, diagnostics: [...] }
 ```
 
 Sensitive values are automatically redacted.
+
+### `getDiagnostics(config)` / `config.getDiagnostics()`
+
+Get diagnostic events from config resolution:
+
+```typescript
+import { resolve, getDiagnostics } from "confts";
+
+const config = resolve(schema, options);
+
+// As standalone function
+const diagnostics = getDiagnostics(config);
+
+// Or as method on config
+const diagnostics = config.getDiagnostics();
+```
+
+Diagnostic event types:
+- `configPath` - which config file was selected and why
+- `loader` - which file loader was used
+- `sourceDecision` - which source was picked for each key (with all tried sources)
+- `note` - custom diagnostic notes
 
 ## Composable Configs
 
