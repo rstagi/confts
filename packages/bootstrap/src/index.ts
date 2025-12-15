@@ -1,7 +1,7 @@
 import { resolve as resolvePath } from "node:path";
 import { fileURLToPath } from "node:url";
 import { resolve } from "confts";
-import type { ConftsSchema, InferSchema } from "confts";
+import type { ConftsSchema, ResolvedConfig } from "confts";
 
 export interface ListenOptions {
   port: number;
@@ -25,7 +25,7 @@ export interface Service<
   S extends ConftsSchema<Record<string, unknown>>,
   T extends ServerLike,
 > {
-  create: (options?: ResolveParams) => Promise<{ server: T, config: InferSchema<S> }>;
+  create: (options?: ResolveParams) => Promise<{ server: T, config: ResolvedConfig<S> }>;
   run: (options?: RunOptions) => Promise<void>;
 }
 
@@ -41,9 +41,9 @@ export interface RunOptions {
 export type AutorunOptions<T> =
   | { enabled: false }
   | ({
-      enabled: true;
-      runOptions?: Partial<RunOptions> | ((config: T) => Partial<RunOptions>);
-    } & ({ meta: ImportMeta } | { module: NodeModule }));
+    enabled: true;
+    runOptions?: Partial<RunOptions> | ((config: T) => Partial<RunOptions>);
+  } & ({ meta: ImportMeta } | { module: NodeModule }));
 
 export interface StartupOptions<T = unknown> extends ResolveParams {
   autorun?: AutorunOptions<T>;
@@ -55,7 +55,7 @@ export function bootstrap<
   T extends ServerLike,
 >(
   configSchema: S,
-  factory: (config: InferSchema<S>) => T | Promise<T>
+  factory: (config: ResolvedConfig<S>) => T | Promise<T>
 ): Service<S, T>;
 
 // Overload: bootstrap(schema, options, factory)
@@ -64,8 +64,8 @@ export function bootstrap<
   T extends ServerLike,
 >(
   configSchema: S,
-  options: StartupOptions<InferSchema<S>>,
-  factory: (config: InferSchema<S>) => T | Promise<T>
+  options: StartupOptions<ResolvedConfig<S>>,
+  factory: (config: ResolvedConfig<S>) => T | Promise<T>
 ): Service<S, T>;
 
 // Implementation
@@ -74,11 +74,11 @@ export function bootstrap<
   T extends ServerLike,
 >(
   configSchema: S,
-  factoryOrOptions: ((config: InferSchema<S>) => T | Promise<T>) | StartupOptions<InferSchema<S>>,
-  maybeFactory?: (config: InferSchema<S>) => T | Promise<T>
+  factoryOrOptions: ((config: ResolvedConfig<S>) => T | Promise<T>) | StartupOptions<ResolvedConfig<S>>,
+  maybeFactory?: (config: ResolvedConfig<S>) => T | Promise<T>
 ): Service<S, T> {
   const isOptionsSignature = typeof factoryOrOptions !== "function";
-  const options: StartupOptions<InferSchema<S>> = isOptionsSignature ? factoryOrOptions : {};
+  const options: StartupOptions<ResolvedConfig<S>> = isOptionsSignature ? factoryOrOptions : {};
   const factory = isOptionsSignature ? maybeFactory! : factoryOrOptions;
 
   const resolveConfig = (overrides?: ResolveParams) => {
@@ -89,11 +89,11 @@ export function bootstrap<
       env: params.env ?? process.env,
       secretsPath: params.secretsPath,
       override: params.override,
-    }) as InferSchema<S>;
+    });
   };
 
   const service: Service<S, T> = {
-    async create(createOptions?: ResolveParams): Promise<{ server: T, config: InferSchema<S> }> {
+    async create(createOptions?: ResolveParams): Promise<{ server: T, config: ResolvedConfig<S> }> {
       const config = resolveConfig(createOptions);
       return {
         server: await factory(config),
