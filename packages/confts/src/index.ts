@@ -1,12 +1,13 @@
 // Core
 export { schema, field } from "./schema";
-export { resolveValues, getSources, type ResolveOptions } from "./values";
+export { resolveValues, getSources, getDiagnostics, type ResolveOptions } from "./values";
 export { resolve, type ResolveOptions as ResolveFileOptions } from "./resolve";
 export { ConfigError } from "./errors";
 
 // Types
 export type {
   ConfigSource,
+  DiagnosticEvent,
   FieldConfig,
   SchemaDefinition,
   ConftsSchema,

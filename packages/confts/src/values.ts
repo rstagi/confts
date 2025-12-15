@@ -3,7 +3,8 @@ import { isAbsolute, join } from "node:path";
 import { loadEnv } from "./loaders/env";
 import { loadSecretFile } from "./loaders/secretFile";
 import { ConfigError, formatValue } from "./errors";
-import type { ConfigSource, ConftsSchema, InferSchema } from "./types";
+import type { ConfigSource, ConftsSchema, InferSchema, DiagnosticEvent } from "./types";
+import { DiagnosticsCollector } from "./diagnostics";
 
 export interface ResolveOptions {
   initialValues?: Record<string, unknown>;
@@ -12,6 +13,8 @@ export interface ResolveOptions {
   secretsPath?: string;
   override?: Record<string, unknown>;
   configPath?: string;
+  /** @internal */
+  _collector?: DiagnosticsCollector;
 }
 
 interface KeyMeta {
@@ -28,6 +31,7 @@ interface ResolveResult {
 }
 
 const SOURCES_SYMBOL = Symbol("confts.sources");
+const DIAGNOSTICS_SYMBOL = Symbol("confts.diagnostics");
 
 export function getSources(config: unknown): Record<string, ConfigSource> | undefined {
   if (config && typeof config === "object") {
@@ -36,12 +40,20 @@ export function getSources(config: unknown): Record<string, ConfigSource> | unde
   return undefined;
 }
 
+export function getDiagnostics(config: unknown): DiagnosticEvent[] | undefined {
+  if (config && typeof config === "object") {
+    return (config as Record<symbol, unknown>)[DIAGNOSTICS_SYMBOL] as DiagnosticEvent[] | undefined;
+  }
+  return undefined;
+}
+
 export function resolveValues<S extends ConftsSchema<Record<string, unknown>>>(
   schema: S,
   options: ResolveOptions = {}
 ): InferSchema<S> {
-  const { initialValues, fileValues, env = process.env, secretsPath = "/secrets", override, configPath } = options;
-  const { value, sources } = resolveValue(schema, [], initialValues, fileValues, env, secretsPath, override, configPath);
+  const { initialValues, fileValues, env = process.env, secretsPath = "/secrets", override, configPath, _collector } = options;
+  const collector = _collector ?? new DiagnosticsCollector();
+  const { value, sources } = resolveValue(schema, [], initialValues, fileValues, env, secretsPath, override, configPath, collector);
   const result = value as InferSchema<S>;
 
   Object.defineProperty(result, "toString", {
@@ -56,14 +68,29 @@ export function resolveValues<S extends ConftsSchema<Record<string, unknown>>>(
     writable: false,
   });
 
+  Object.defineProperty(result, DIAGNOSTICS_SYMBOL, {
+    value: collector.getEvents(),
+    enumerable: false,
+    writable: false,
+  });
+
   Object.defineProperty(result, "toSourceString", {
     value: () => JSON.stringify(getSources(result)),
     enumerable: false,
     writable: false,
   });
 
+  Object.defineProperty(result, "getDiagnostics", {
+    value: () => getDiagnostics(result),
+    enumerable: false,
+    writable: false,
+  });
+
   Object.defineProperty(result, "toDebugObject", {
-    value: () => buildDebugObject(schema, result, sources),
+    value: () => ({
+      config: buildConfigDebugObject(schema, result, sources),
+      diagnostics: getDiagnostics(result) ?? [],
+    }),
     enumerable: false,
     writable: false,
   });
@@ -79,13 +106,14 @@ function resolveValue(
   env: Record<string, string | undefined>,
   secretsPath: string,
   override: Record<string, unknown> | undefined,
-  configPath: string | undefined
+  configPath: string | undefined,
+  collector: DiagnosticsCollector
 ): ResolveResult {
   if (isZodObject(schema)) {
     const result: Record<string, unknown> = {};
     const sources: Record<string, ConfigSource> = {};
     for (const [key, childSchema] of Object.entries(schema.shape)) {
-      const childResult = resolveValue(childSchema, [...path, key], initialValues, fileValues, env, secretsPath, override, configPath);
+      const childResult = resolveValue(childSchema, [...path, key], initialValues, fileValues, env, secretsPath, override, configPath, collector);
       result[key] = childResult.value;
       Object.assign(sources, childResult.sources);
     }
@@ -99,6 +127,7 @@ function resolveValue(
   const meta = getMeta(schema);
   const pathStr = path.join(".");
   const sensitive = meta?.sensitive ?? false;
+  const tried: string[] = [];
 
   // Get nested values for this specific key path
   const overrideValue = path.reduce<unknown>((acc, key) => {
@@ -121,15 +150,18 @@ function resolveValue(
   let source: ConfigSource | undefined;
 
   if (overrideValue !== undefined) {
+    tried.push("override");
     value = overrideValue;
     source = "override";
   }
 
   if (value === undefined && meta?.env !== undefined) {
+    const envSource = `env:${meta.env}`;
+    tried.push(envSource);
     const envValue = loadEnv(meta.env, env);
     if (envValue !== undefined) {
       value = envValue;
-      source = `env:${meta.env}`;
+      source = envSource;
     }
   }
 
@@ -137,24 +169,30 @@ function resolveValue(
     const secretFilePath = isAbsolute(meta.secretFile)
       ? meta.secretFile
       : join(secretsPath, meta.secretFile);
+    const secretSource = `secretFile:${secretFilePath}`;
+    tried.push(secretSource);
     const secretValue = loadSecretFile(secretFilePath);
     if (secretValue !== undefined) {
       value = secretValue;
-      source = `secretFile:${secretFilePath}`;
+      source = secretSource;
     }
   }
 
   if (value === undefined && fileValue !== undefined) {
+    const fileSource = configPath ? `file:${configPath}` : "file";
+    tried.push(fileSource);
     value = fileValue;
-    source = configPath ? `file:${configPath}` : "file";
+    source = fileSource;
   }
 
   if (value === undefined && initialValue !== undefined) {
+    tried.push("initial");
     value = initialValue;
     source = "initial";
   }
 
   if (value === undefined && meta?.default !== undefined) {
+    tried.push("default");
     value = meta.default;
     source = "default";
   }
@@ -177,6 +215,8 @@ function resolveValue(
     );
   }
 
+  collector.addSourceDecision(pathStr, source!, tried);
+
   return { value: result.data, source: source!, sources: { [pathStr]: source! } };
 }
 
@@ -197,7 +237,7 @@ function redactValue(schema: ZodTypeAny, value: unknown): unknown {
   return value;
 }
 
-function buildDebugObject(
+function buildConfigDebugObject(
   schema: ZodTypeAny,
   value: unknown,
   sources: Record<string, ConfigSource>,
@@ -206,7 +246,7 @@ function buildDebugObject(
   if (isZodObject(schema) && value && typeof value === "object") {
     const result: Record<string, unknown> = {};
     for (const [key, childSchema] of Object.entries(schema.shape)) {
-      result[key] = buildDebugObject(
+      result[key] = buildConfigDebugObject(
         childSchema,
         (value as Record<string, unknown>)[key],
         sources,

@@ -2,6 +2,13 @@ import type { ZodTypeAny, ZodObject, z } from "zod";
 
 export type ConfigSource = string;
 
+// Diagnostic event types
+export type DiagnosticEvent =
+  | { type: "configPath"; picked: string | null; candidates: string[]; reason: string }
+  | { type: "loader"; format: string; used: boolean; reason?: string }
+  | { type: "sourceDecision"; key: string; picked: string; tried: string[] }
+  | { type: "note"; message: string; meta?: Record<string, unknown> };
+
 export interface FieldConfig<T extends ZodTypeAny = ZodTypeAny> {
   type: T;
   env?: string;

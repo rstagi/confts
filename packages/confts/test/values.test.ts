@@ -364,10 +364,12 @@ describe("resolveValues()", () => {
         port: field({ type: z.number(), default: 3000 }),
       });
       const config = resolveValues(s, { env: { HOST: "localhost" } });
-      expect(config.toDebugObject()).toEqual({
+      const debug = config.toDebugObject();
+      expect(debug.config).toEqual({
         host: { value: "localhost", source: "env:HOST" },
         port: { value: 3000, source: "default" },
       });
+      expect(debug).toHaveProperty("diagnostics");
     });
 
     it("handles nested schemas", () => {
@@ -378,7 +380,8 @@ describe("resolveValues()", () => {
         },
       });
       const config = resolveValues(s, { env: { DB_HOST: "localhost" } });
-      expect(config.toDebugObject()).toEqual({
+      const debug = config.toDebugObject();
+      expect(debug.config).toEqual({
         db: {
           host: { value: "localhost", source: "env:DB_HOST" },
           port: { value: 5432, source: "default" },
@@ -398,7 +401,8 @@ describe("resolveValues()", () => {
         password: field({ type: z.string(), default: "secret123", sensitive: true }),
       });
       const config = resolveValues(s, { env: {} });
-      expect(config.toDebugObject()).toEqual({
+      const debug = config.toDebugObject();
+      expect(debug.config).toEqual({
         host: { value: "localhost", source: "default" },
         password: { value: "[REDACTED]", source: "default" },
       });
