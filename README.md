@@ -4,307 +4,110 @@
 
 Dev-friendly TypeScript config library wrapping Zod with multi-source value resolution.
 
-## Packages
+## Features
 
-| Package | Description |
-|---------|-------------|
-| `confts` | Core - schema, field, resolve, value resolution |
-| `@confts/yaml-loader` | YAML file support (optional) |
-| `@confts/bootstrap` | Server lifecycle management (optional) |
+- Type-safe config with Zod validation
+- Multi-source value resolution (env vars, secret files, config files)
+- JSON support built-in, YAML via optional package
+- Sensitive value redaction in errors and logs
+- Composable nested schemas
+- Server bootstrap with graceful shutdown (optional)
+- Source tracking and diagnostics
 
-## Installation
+## Install
 
 ```bash
-# Core only (JSON config)
 npm install confts zod
-
-# With YAML support
-npm install confts @confts/yaml-loader zod
-
-# With server bootstrap
-npm install confts @confts/bootstrap zod
 ```
 
 ## Quick Start
 
 ```typescript
 import { schema, field, resolve } from "confts";
-import "@confts/yaml-loader"; // enables YAML support (side-effect import)
 import { z } from "zod";
 
 const configSchema = schema({
   appName: "my-app", // literal value
-  someKey: {
-    publishableKey: field({
-      type: z.string().nonempty(),
-      env: "MY_PUBLISHABLE_KEY",
-    }),
-    secretKey: field({
-      type: z.string().nonempty(),
-      secretFile: "some-secret-file-name",
+  db: {
+    host: field({ type: z.string(), env: "DB_HOST", default: "localhost" }),
+    port: field({ type: z.coerce.number(), env: "DB_PORT", default: 5432 }),
+    password: field({
+      type: z.string(),
+      env: "DB_PASSWORD",
+      secretFile: "db-password",
       sensitive: true,
     }),
-    nested: {
-      someNestedKey: field({ type: z.number(), env: "MY_VAR", default: 3000 }),
-    },
   },
 });
 
-const config = resolve(configSchema, { configPath: "./config.yaml" });
-// config is fully typed
-```
-
-**JSON-only** (no yaml-loader needed):
-```typescript
-import { schema, field, resolve } from "confts";
 const config = resolve(configSchema, { configPath: "./config.json" });
+// config is fully typed: { appName: "my-app", db: { host: string, port: number, password: string } }
 ```
 
-## Value Resolution
+## Bootstrap
 
-Values are resolved in priority order:
-
-1. **Override** (`override` in resolve options) - highest priority
-2. **Environment variable** (`env`)
-3. **Secret file** (`secretFile`) - reads file content
-4. **Config file** (YAML/JSON)
-5. **Initial values** (`initialValues` in resolve options)
-6. **Default value** (`default`)
-
-## API
-
-### `field(config)`
-
-Define a config field with metadata:
-
-```typescript
-field({
-  type: z.string(),        // Zod type (required)
-  env: "MY_VAR",           // env var name
-  secretFile: "/path",     // path to secret file
-  sensitive: true,         // redact in errors
-  default: "value",        // fallback value
-  doc: "Description",      // field description (uses z.describe)
-});
-```
-
-### `schema(definition)`
-
-Build a typed schema from a definition object:
-
-```typescript
-const s = schema({
-  literal: "value",           // becomes z.literal("value")
-  myField: field({ type: z.string() }),
-  nested: { deep: field({ type: z.number() }) },
-});
-```
-
-### `resolve(schema, options)`
-
-Load and validate config:
-
-```typescript
-const config = resolve(schema, {
-  configPath: "./config.yaml", // or set CONFIG_PATH env (optional)
-  env: process.env,            // custom env (default: process.env)
-  secretsPath: "/secrets",     // base path for secret files
-  initialValues: { port: 8080 }, // low-priority defaults
-  override: { host: "prod.example.com" }, // highest priority overrides
-});
-```
-
-Supports `.yaml`, `.yml`, and `.json` files.
-
-### `getSources(config)`
-
-Get which source each config value came from (useful for debugging/logging):
-
-```typescript
-import { resolveValues, getSources } from "confts";
-
-const config = resolveValues(schema, options);
-const sources = getSources(config);
-// { host: "env:HOST", port: "default", "db.password": "secretFile:/secrets/db_pass" }
-
-// Or use toSourceString() for logging
-console.log(config.toSourceString());
-// '{"host":"env:HOST","port":"default","db.password":"secretFile:/secrets/db_pass"}'
-```
-
-Source formats:
-- `"override"` - from override option
-- `"env:VAR_NAME"` - from environment variable
-- `"secretFile:/path/to/file"` - from secret file
-- `"file:/path/to/config.yaml"` - from config file
-- `"initial"` - from initialValues option
-- `"default"` - from field default
-
-### `toDebugObject(options?)`
-
-Get config values with embedded source info (useful for debugging):
-
-```typescript
-const config = resolve(schema, options);
-console.log(config.toDebugObject());
-// {
-//   config: {
-//     host: { value: "localhost", source: "env:HOST" },
-//     db: {
-//       port: { value: 5432, source: "default" },
-//       password: { value: "[REDACTED]", source: "secretFile:/secrets/db_pass" }
-//     }
-//   }
-// }
-
-// Include diagnostics for deeper debugging
-console.log(config.toDebugObject({ includeDiagnostics: true }));
-// { config: {...}, diagnostics: [...] }
-```
-
-Sensitive values are automatically redacted.
-
-### `getDiagnostics(config)` / `config.getDiagnostics()`
-
-Get diagnostic events from config resolution:
-
-```typescript
-import { resolve, getDiagnostics } from "confts";
-
-const config = resolve(schema, options);
-
-// As standalone function
-const diagnostics = getDiagnostics(config);
-
-// Or as method on config
-const diagnostics = config.getDiagnostics();
-```
-
-Diagnostic event types:
-- `configPath` - which config file was selected and why
-- `loader` - which file loader was used
-- `sourceDecision` - which source was picked for each key (with all tried sources)
-- `note` - custom diagnostic notes
-
-## Composable Configs
-
-Schemas can be nested inside other schemas for modular config structures:
-
-```typescript
-const dbSchema = schema({
-  host: field({ type: z.string(), env: "DB_HOST" }),
-  port: field({ type: z.number(), default: 5432 }),
-});
-
-const cacheSchema = schema({
-  host: field({ type: z.string(), env: "CACHE_HOST" }),
-  ttl: field({ type: z.number(), default: 3600 }),
-});
-
-const appSchema = schema({
-  db: dbSchema,
-  cache: cacheSchema,
-  name: field({ type: z.string() }),
-});
-
-const config = resolve(appSchema, { configPath: "./config.yaml" });
-// config.db.host, config.cache.ttl, etc. - fully typed
-```
-
-Useful for complex systems with components/sub-components each owning their config.
-
-## Sensitive Values
-
-Mark fields as `sensitive: true` to redact values in error messages:
-
-```typescript
-field({
-  type: z.string(),
-  env: "API_SECRET",
-  sensitive: true, // shows [REDACTED] in errors
-});
-```
-
-## Server Bootstrap
-
-The `bootstrap()` helper from `@confts/bootstrap` provides server lifecycle management with graceful shutdown.
+Server lifecycle management with graceful shutdown.
 
 ```bash
 npm install @confts/bootstrap
 ```
 
-### Auto-run (ESM)
-
-Pass `import.meta` to auto-run when file is executed directly:
+### Runtime (autorun)
 
 ```typescript
-// app.ts (ESM)
+// app.ts
 import { schema, field } from "confts";
 import { bootstrap } from "@confts/bootstrap";
 import { z } from "zod";
+import express from "express";
 
 const configSchema = schema({
   port: field({ type: z.number(), env: "PORT", default: 3000 }),
-  dbUrl: field({ type: z.string(), env: "DATABASE_URL" }),
 });
 
-export default bootstrap(configSchema, { meta: import.meta }, async (config) => {
-  await db.connect(config.dbUrl);
-  const app = express();
-  app.get("/health", (req, res) => res.send("ok"));
-  return app;
-});
+export default bootstrap(
+  configSchema,
+  { autorun: { enabled: true, meta: import.meta } },
+  async (config) => {
+    const app = express();
+    app.get("/health", (req, res) => res.send("ok"));
+    return app;
+  }
+);
 
-// node app.ts     → auto-runs server
-// import from... → just exports service (for tests)
+// node app.ts → auto-runs server
+// import from app.ts → just exports service (for tests)
 ```
 
 ### Testing
 
 ```typescript
-// app.test.ts
 import service from "./app";
 
-const { server } = await service.create({ override: { dbUrl: "test://..." } });
+const { server } = await service.create({ override: { port: 0 } });
 // use supertest(server) - no listen() called
 ```
 
-### API
+See [@confts/bootstrap README](packages/bootstrap/README.md) for details.
 
-Signatures:
-- `bootstrap(schema, factory)` - basic, no auto-run
-- `bootstrap(schema, options, factory)` - with options
+## Resolution Priority
 
-Returns:
-- `create(options?)` - builds server without listening (for tests)
-- `run(options?)` - builds server, listens, handles graceful shutdown
+Values are resolved in order (highest to lowest):
 
-## Migration from 0.9.x
+1. **Override** - `override` option in resolve
+2. **Environment variable** - `env` field option
+3. **Secret file** - `secretFile` field option
+4. **Config file** - JSON/YAML file
+5. **Initial values** - `initialValues` option in resolve
+6. **Default** - `default` field option
 
-### Breaking Changes
+## Packages
 
-**YAML support now requires `@confts/yaml-loader`:**
-```typescript
-// Before (0.9.x)
-import { resolve } from "confts";
-resolve(schema, { configPath: "./config.yaml" }); // worked
-
-// After (0.10.x)
-import { resolve } from "confts";
-import "@confts/yaml-loader"; // required for YAML
-resolve(schema, { configPath: "./config.yaml" });
-```
-
-**`bootstrap()` moved to `@confts/bootstrap`:**
-```typescript
-// Before (0.9.x)
-import { bootstrap } from "confts";
-
-// After (0.10.x)
-import { bootstrap } from "@confts/bootstrap";
-```
-
-JSON config files work without extra packages.
+| Package | Description | Docs |
+|---------|-------------|------|
+| `confts` | Core schema, field, resolve | [README](packages/confts/README.md) |
+| `@confts/yaml-loader` | YAML file support (side-effect import) | [README](packages/yaml-loader/README.md) |
+| `@confts/bootstrap` | Server lifecycle management | [README](packages/bootstrap/README.md) |
 
 ## License
 
