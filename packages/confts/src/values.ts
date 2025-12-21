@@ -194,6 +194,8 @@ function resolveValue(
     source = "default";
   }
 
+  collector.addSourceDecision(pathStr, source!, tried);
+
   if (value === undefined) {
     throw new ConfigError(
       `Missing required config at '${pathStr}' (value: ${formatValue(value, sensitive)})`,
@@ -214,7 +216,6 @@ function resolveValue(
     );
   }
 
-  collector.addSourceDecision(pathStr, source!, tried);
 
   return { value: result.data, source: source!, sources: { [pathStr]: source! } };
 }
