@@ -1,5 +1,11 @@
 # confts
 
+## 0.9.15
+
+### Patch Changes
+
+- 68b2ca8: Add source collection before failing
+
 ## 0.9.14
 
 ### Patch Changes
