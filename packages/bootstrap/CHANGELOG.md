@@ -1,5 +1,13 @@
 # @confts/bootstrap
 
+## 0.9.15
+
+### Patch Changes
+
+- Updated dependencies [68b2ca8]
+  - confts@0.9.15
+  - @confts/yaml-loader@0.9.15
+
 ## 0.9.14
 
 ### Patch Changes
