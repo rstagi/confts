@@ -1,6 +1,7 @@
 {
   "name": "zfig-monorepo",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "build": "pnpm -r build",
     "test": "vitest run",

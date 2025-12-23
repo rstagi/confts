@@ -1,8 +1,20 @@
-# zfig
+<p align="center">
+  <img src="assets/zfig.png" alt="zfig logo" width="200" />
+</p>
 
-[![npm version](https://img.shields.io/npm/v/zfig.svg)](https://www.npmjs.com/package/zfig)
+<h1 align="center">zfig</h1>
 
-Dev-friendly TypeScript config library wrapping Zod with multi-source value resolution.
+<p align="center">Dev-friendly TypeScript config library wrapping Zod with multi-source value resolution.</p>
+
+<p align="center">By <a href="https://github.com/rstagi">@rstagi</a></p>
+
+<p align="center">
+  <a href="https://github.com/rstagi/zfig/actions/workflows/ci.yml"><img src="https://github.com/rstagi/zfig/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://www.npmjs.com/package/zfig"><img src="https://img.shields.io/npm/dm/zfig.svg" alt="npm downloads" /></a>
+  <a href="https://github.com/rstagi/zfig/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License: MIT" /></a>
+  <a href="https://github.com/rstagi/zfig"><img src="https://img.shields.io/github/stars/rstagi/zfig" alt="GitHub stars" /></a>
+</p>
+
 
 ## Features
 
